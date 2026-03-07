@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>勾平叉计分器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            padding: 12px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 6px;
+            font-size: 1.8em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 0.85em;
+            margin-bottom: 16px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+
+        h2 {
+            margin-bottom: 12px;
+            color: #2c3e50;
+            font-size: 1.05em;
+            font-weight: 600;
+        }
+
+        /* 优化玩家列表布局 - 使用网格而不是横向滚动 */
+        .player-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .player-tag {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: #f8f9fa;
+            padding: 6px 8px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            transition: all 0.2s;
+        }
+
+        .player-tag:hover {
+            border-color: #3498db;
+        }
+
+        .player-tag input {
+            border: none;
+            background: transparent;
+            width: 100%;
+            min-width: 60px;
+            font-size: 13px;
+            outline: none;
+            text-align: center;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        .btn {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+            padding: 4px 6px;
+            font-size: 11px;
+            min-width: 24px;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #e67e22;
+        }
+
+        .action-bar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        /* 优化游戏网格 - 确保一屏显示 */
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .player-card {
+            background: #f8f9fa;
+            padding: 10px 8px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .player-card.winner {
+            border-color: #27ae60;
+            background: #d4edda;
+        }
+
+        .player-card.loser {
+            border-color: #e9ecef;
+        }
+
+        .player-name {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #2c3e50;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .radio-group {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .radio-label {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #555;
+        }
+
+        .radio-label input {
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+        }
+
+        .number-input {
+            width: 100%;
+            padding: 6px 4px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            text-align: center;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .number-input:focus {
+            border-color: #3498db;
+        }
+
+        .number-input:disabled {
+            background: #c3e6cb;
+            border-color: #27ae60;
+            color: #155724;
+            cursor: not-allowed;
+        }
+
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .stats-table th,
+        .stats-table td {
+            padding: 6px 3px;
+            text-align: center;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .stats-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+            font-size: 11px;
+        }
+
+        .stats-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .stats-table .total-row {
+            background: #e3f2fd !important;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .score-win {
+            color: #27ae60;
+            font-weight: 700;
+        }
+
+        .score-lose {
+            color: #e74c3c;
+            font-weight: 700;
+        }
+
+        .score-none {
+            color: #bbb;
+            font-size: 11px;
+        }
+
+        .winner-icon {
+            margin-left: 2px;
+        }
+
+        .old-player {
+            color: #999;
+            font-size: 10px;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #95a5a6;
+            padding: 30px;
+            font-size: 13px;
+        }
+
+        .compact-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 6px 10px;
+            background: #f0f4f8;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .edit-hint {
+            font-size: 11px;
+            color: #e67e22;
+            margin-bottom: 10px;
+            padding: 6px 10px;
+            background: #fef3e2;
+            border-radius: 6px;
+            border-left: 3px solid #e67e22;
+        }
+
+        .history-note {
+            font-size: 10px;
+            color: #999;
+            margin-top: 6px;
+            font-style: italic;
+        }
+
+        /* 重新开始确认弹窗 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 300px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal h3 {
+            margin-bottom: 12px;
+            color: #2c3e50;
+            font-size: 1.1em;
+        }
+
+        .modal p {
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 8px; }
+            h1 { font-size: 1.5em; }
+            .card { padding: 12px; margin-bottom: 10px; }
+            .game-grid { 
+                grid-template-columns: repeat(3, 1fr); 
+                gap: 6px;
+            }
+            .player-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .player-card { padding: 8px 4px; }
+            .player-name { font-size: 12px; margin-bottom: 4px; }
+            .radio-group { gap: 6px; margin-bottom: 4px; }
+            .radio-label { font-size: 11px; }
+            .number-input { padding: 5px 2px; font-size: 12px; }
+        }
+
+        @media (max-width: 360px) {
+            .game-grid { grid-template-columns: repeat(2, 1fr); }
+            .player-row { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>勾平叉计分器</h1>
+        <p class="subtitle">积分统计 · 数据自动保存</p>
+
+        <!-- 设置 -->
+        <div class="card" id="setupCard">
+            <h2>玩家设置 <span style="font-size: 12px; color: #999; font-weight: normal;">(2-8人)</span></h2>
+            <div class="edit-hint hidden" id="editHint">
+                ✏️ 修改名称会同步更新历史记录<br>
+                <span style="color: #999;">删除玩家：该玩家历史数据保留但显示为"离场"</span>
+            </div>
+            <div class="player-row" id="playerRow"></div>
+            <div class="action-bar">
+                <button class="btn btn-primary" onclick="addPlayer()" id="addBtn">+ 添加</button>
+                <button class="btn btn-success" onclick="startGame()" id="startBtn">开始</button>
+                <button class="btn btn-secondary" onclick="resetData()">清空所有</button>
+            </div>
+        </div>
+
+        <!-- 游戏 -->
+        <div class="card hidden" id="gameCard">
+            <div class="compact-info">
+                <span>第 <strong id="roundNum">1</strong> 局</span>
+                <span style="color: #27ae60; font-size: 12px;">● 自动保存中</span>
+            </div>
+            <div class="game-grid" id="gameGrid"></div>
+            <div class="action-bar">
+                <button class="btn btn-success" onclick="recordRound()">记录本局</button>
+                <button class="btn btn-primary" onclick="undoRound()" id="undoBtn" disabled>撤销</button>
+                <button class="btn btn-warning" onclick="showRestartModal()">重新开始</button>
+                <button class="btn btn-secondary" onclick="editPlayers()">修改玩家</button>
+            </div>
+        </div>
+
+        <!-- 统计 -->
+        <div class="card hidden" id="statsCard">
+            <h2>战绩统计</h2>
+            <div id="statsContent">
+                <div class="empty-state">暂无记录</div>
+            </div>
+            <div class="history-note" id="historyNote"></div>
+        </div>
+    </div>
+
+    <!-- 重新开始确认弹窗 -->
+    <div class="modal-overlay" id="restartModal">
+        <div class="modal">
+            <h3>🔄 重新开始游戏</h3>
+            <p>确定要重新开始吗？<br>当前游戏进度将被清空，但玩家名单会保留。</p>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="hideRestartModal()">取消</button>
+                <button class="btn btn-warning" onclick="confirmRestart()">确认重新开始</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'gpx_data_v4';
+        let state = {
+            players: ['张三', '李四', '王五'],
+            allPlayers: ['张三', '李四', '王五'],
+            rounds: [],
+            currentRound: 1,
+            isPlaying: false,
+            isEditing: false
+        };
+
+        function init() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                state = JSON.parse(saved);
+                if (!state.allPlayers) state.allPlayers = [...state.players];
+            }
+            renderSetup();
+            if (state.isPlaying) showGame();
+        }
+
+        function save() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }
+
+        function renderSetup() {
+            const row = document.getElementById('playerRow');
+            row.innerHTML = '';
+            state.players.forEach((name, i) => {
+                const tag = document.createElement('div');
+                tag.className = 'player-tag';
+                tag.innerHTML = `
+                    <input value="${name}" onchange="updateName(${i}, this.value)" placeholder="玩家${i+1}">
+                    <button class="btn btn-danger" onclick="removePlayer(${i})" ${state.players.length<=2?'disabled':''}>×</button>
+                `;
+                row.appendChild(tag);
+            });
+            document.getElementById('addBtn').disabled = state.players.length >= 8;
+            document.getElementById('editHint').classList.toggle('hidden', !state.isEditing);
+            document.getElementById('startBtn').textContent = state.isEditing ? '保存返回' : '开始';
+        }
+
+        function updateName(i, val) {
+            const oldName = state.players[i];
+            const newName = val.trim() || `玩家${i+1}`;
+            state.players[i] = newName;
+            
+            const allIdx = state.allPlayers.indexOf(oldName);
+            if (allIdx !== -1) state.allPlayers[allIdx] = newName;
+            
+            state.rounds.forEach(r => {
+                r.details.forEach(d => {
+                    if (d.name === oldName) d.name = newName;
+                });
+            });
+            
+            save();
+        }
+
+        function addPlayer() {
+            if (state.players.length >= 8) return;
+            const newName = `玩家${state.players.length + 1}`;
+            state.players.push(newName);
+            state.allPlayers.push(newName);
+            save();
+            renderSetup();
+        }
+
+        function removePlayer(i) {
+            if (state.players.length <= 2) return;
+            
+            const name = state.players[i];
+            if (!confirm(`确定删除玩家"${name}"？\n\n该玩家历史数据将保留，但后续新局无法参与。`)) {
+                return;
+            }
+            
+            state.players.splice(i, 1);
+            save();
+            renderSetup();
+        }
+
+        function startGame() {
+            const inputs = document.querySelectorAll('#playerRow input');
+            state.players = state.players.map((_, i) => {
+                return inputs[i]?.value.trim() || `玩家${i+1}`;
+            });
+            
+            state.players.forEach((name, i) => {
+                if (state.allPlayers[i] !== name) {
+                    const oldIdx = state.allPlayers.indexOf(state.allPlayers[i]);
+                    if (oldIdx !== -1) state.allPlayers[oldIdx] = name;
+                }
+            });
+            
+            state.isPlaying = true;
+            state.isEditing = false;
+            save();
+            showGame();
+        }
+
+        function showGame() {
+            document.getElementById('setupCard').classList.add('hidden');
+            document.getElementById('gameCard').classList.remove('hidden');
+            document.getElementById('statsCard').classList.remove('hidden');
+            renderGame();
+            updateStats();
+        }
+
+        function renderGame() {
+            document.getElementById('roundNum').textContent = state.currentRound;
+            const grid = document.getElementById('gameGrid');
+            grid.innerHTML = '';
+            
+            state.players.forEach((name, i) => {
+                const card = document.createElement('div');
+                card.className = 'player-card';
+                card.id = `pc${i}`;
+                card.innerHTML = `
+                    <div class="player-name">${name}</div>
+                    <div class="radio-group">
+                        <label class="radio-label"><input type="radio" name="r${i}" onchange="setWinner(${i})">胜</label>
+                        <label class="radio-label"><input type="radio" name="r${i}" checked onchange="setLoser(${i})">剩</label>
+                    </div>
+                    <input type="number" class="number-input" id="c${i}" min="0" placeholder="剩牌">
+                `;
+                grid.appendChild(card);
+            });
+            setWinner(0);
+        }
+
+        function setWinner(i) {
+            state.players.forEach((_, idx) => {
+                const card = document.getElementById(`pc${idx}`);
+                const input = document.getElementById(`c${idx}`);
+                const radios = document.getElementsByName(`r${idx}`);
+                if (idx === i) {
+                    card.className = 'player-card winner';
+                    input.disabled = true;
+                    input.value = '';
+                    input.placeholder = '获胜';
+                    radios[0].checked = true;
+                } else {
+                    card.className = 'player-card loser';
+                    input.disabled = false;
+                    input.placeholder = '剩牌';
+                    radios[1].checked = true;
+                }
+            });
+        }
+
+        function setLoser(i) {
+            const card = document.getElementById(`pc${i}`);
+            const input = document.getElementById(`c${i}`);
+            card.className = 'player-card loser';
+            input.disabled = false;
+            input.placeholder = '剩牌';
+        }
+
+        function recordRound() {
+            let winner = -1, total = 0;
+            const details = [];
+            
+            for (let i = 0; i < state.players.length; i++) {
+                const isWin = document.getElementsByName(`r${i}`)[0].checked;
+                if (isWin) winner = i;
+                const cards = isWin ? 0 : (parseInt(document.getElementById(`c${i}`).value) || 0);
+                if (!isWin && cards === 0 && document.getElementById(`c${i}`).value !== '0') {
+                    alert(`请输入 ${state.players[i]} 的剩牌数`);
+                    return;
+                }
+                details.push({
+                    idx: i, 
+                    name: state.players[i], 
+                    cards, 
+                    isWin, 
+                    score: 0,
+                    playerRound: state.currentRound
+                });
+                if (!isWin) total += cards;
+            }
+            
+            if (winner === -1) {
+                alert('请选择获胜者');
+                return;
+            }
+            
+            details.forEach(d => d.score = d.isWin ? total : -d.cards);
+            state.rounds.push({
+                round: state.currentRound, 
+                details,
+                playerCount: state.players.length
+            });
+            state.currentRound++;
+            save();
+            
+            document.getElementById('undoBtn').disabled = false;
+            renderGame();
+            updateStats();
+        }
+
+        function undoRound() {
+            if (!state.rounds.length) return;
+            if (!confirm('撤销上局？')) return;
+            state.rounds.pop();
+            state.currentRound--;
+            save();
+            document.getElementById('roundNum').textContent = state.currentRound;
+            if (!state.rounds.length) document.getElementById('undoBtn').disabled = true;
+            updateStats();
+        }
+
+        function editPlayers() {
+            state.isEditing = true;
+            save();
+            document.getElementById('setupCard').classList.remove('hidden');
+            document.getElementById('gameCard').classList.add('hidden');
+            document.getElementById('statsCard').classList.add('hidden');
+            renderSetup();
+        }
+
+        // 重新开始功能
+        function showRestartModal() {
+            document.getElementById('restartModal').classList.add('show');
+        }
+
+        function hideRestartModal() {
+            document.getElementById('restartModal').classList.remove('show');
+        }
+
+        function confirmRestart() {
+            // 保留玩家列表，清空游戏进度
+            state.rounds = [];
+            state.currentRound = 1;
+            state.isPlaying = true;
+            state.isEditing = false;
+            save();
+            hideRestartModal();
+            renderGame();
+            updateStats();
+            document.getElementById('undoBtn').disabled = true;
+        }
+
+        function updateStats() {
+            const box = document.getElementById('statsContent');
+            const note = document.getElementById('historyNote');
+            
+            if (!state.rounds.length) {
+                box.innerHTML = '<div class="empty-state">暂无记录</div>';
+                note.textContent = '';
+                return;
+            }
+            
+            const totals = {};
+            state.players.forEach(p => totals[p] = 0);
+            
+            state.rounds.forEach(r => {
+                r.details.forEach(d => {
+                    if (totals.hasOwnProperty(d.name)) {
+                        totals[d.name] += d.score;
+                    }
+                });
+            });
+            
+            const currentPlayerSet = new Set(state.players);
+            const oldPlayers = [...new Set(state.rounds.flatMap(r => r.details.map(d => d.name)))]
+                .filter(name => !currentPlayerSet.has(name));
+            
+            const displayPlayers = [...state.players, ...oldPlayers];
+            
+            let html = '<table class="stats-table"><thead><tr><th>#</th>';
+            displayPlayers.forEach(name => {
+                const isOld = oldPlayers.includes(name);
+                html += `<th>${name}${isOld ? '<br><span class="old-player">(离场)</span>' : ''}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+            
+            state.rounds.slice(-20).forEach(r => {
+                html += `<tr><td>${r.round}</td>`;
+                displayPlayers.forEach(name => {
+                    const d = r.details.find(x => x.name === name);
+                    if (d) {
+                        const cls = d.score > 0 ? 'score-win' : 'score-lose';
+                        const icon = d.isWin ? '👑' : '';
+                        html += `<td class="${cls}">${d.score>0?'+':''}${d.score}${icon}</td>`;
+                    } else {
+                        html += `<td class="score-none">-</td>`;
+                    }
+                });
+                html += '</tr>';
+            });
+            
+            html += '<tr class="total-row"><td>总计</td>';
+            displayPlayers.forEach(name => {
+                const score = totals[name] || 0;
+                const isOld = oldPlayers.includes(name);
+                const cls = score > 0 ? 'score-win' : (score < 0 ? 'score-lose' : '');
+                const sign = score > 0 ? '+' : '';
+                const oldTag = isOld ? '<br><span class="old-player">不计入</span>' : '';
+                html += `<td class="${cls}">${sign}${score}${oldTag}</td>`;
+            });
+            html += '</tr></tbody></table>';
+            
+            box.innerHTML = html;
+            
+            if (oldPlayers.length > 0) {
+                note.innerHTML = `💡 共${state.rounds.length}局，${oldPlayers.length}位玩家已离场，其历史数据保留但总计仅计算当前在场玩家`;
+            } else {
+                note.textContent = `💡 共${state.rounds.length}局，所有玩家均在游戏中`;
+            }
+        }
+
+        function resetData() {
+            if (!confirm('清空所有数据？此操作不可恢复！')) return;
+            state = {
+                players: ['张三', '李四', '王五'], 
+                allPlayers: ['张三', '李四', '王五'], 
+                rounds: [], 
+                currentRound: 1, 
+                isPlaying: false, 
+                isEditing: false
+            };
+            localStorage.removeItem(STORAGE_KEY);
+            location.reload();
+        }
+
+        // 点击弹窗外部关闭
+        document.getElementById('restartModal').addEventListener('click', function(e) {
+            if (e.target === this) hideRestartModal();
+        });
+
+        window.onload = init;
+    </script>
+</body>
+</html>
