@@ -1,3 +1,24 @@
+/*
+ * SI4732/SI4735 All-band receiver firmware for Lilygo T-Display-S3.
+ *
+ * Derived from:
+ *   - PU2CLR SI4735 Arduino library and ALL_IN_ONE_T_Embed example sketch,
+ *     Copyright (c) 2019 Ricardo Lima Caratti (https://github.com/pu2clr/SI4735),
+ *     MIT License.
+ *   - User-interface design originally by VolosR's TEmbedFMRadio
+ *     (https://github.com/VolosR/TEmbedFMRadio), adapted to SI473x by PU2CLR.
+ *
+ * T-Display-S3 port, Chinese UI, station presets, auto screen-off and
+ * battery calibration by zhang-chong (https://github.com/zhang-chong/4732mini).
+ *
+ * This fork: https://github.com/Aiaid/4732mini
+ *
+ * Distributed under the MIT License. See the LICENSE file in the repository
+ * root for full terms. The above copyright notice and this permission
+ * notice shall be included in all copies or substantial portions of the
+ * Software.
+ */
+
 #include <Wire.h>
 #include <TFT_eSPI.h>
 #include "EEPROM.h"
