@@ -12,15 +12,55 @@ The repository also contains an unrelated standalone HTML app `勾平叉.html` (
 
 ## Build / flash
 
-There is no Makefile, PlatformIO config, or CI. The sketch is meant to be opened in the **Arduino IDE** with these settings:
+This fork has both an Arduino IDE flow (matching upstream) and a **PlatformIO** flow (preferred for command-line work and the diagnostic probe environment). Common board settings either way:
 
-- Board: **ESP32S3 Dev Module** (or "LilyGo T-Display-S3").
-- USB CDC On Boot: **Enabled**.
-- Flash size: 16MB; PSRAM: OPI PSRAM (typical for T-Display-S3).
-- All required libraries are vendored under `libraries/` — copy that directory into `~/Documents/Arduino/libraries/` (or symlink it) before compiling. Bundled libs include a customized `TFT_eSPI_DynamicSpeed` (must be used in place of stock TFT_eSPI — pin map and config are tuned for T-Display-S3), `PU2CLR_SI4735`, `Battery18650Stats`, `ESP32Time`, `GFX_Library_for_Arduino`, `Adafruit_BusIO`, `Adafruit_MPR121`.
-- EEPROM_SIZE is 2048; the sketch verifies `app_id = 47` at offset 0 before trusting persisted state — bump `app_id` whenever the on-flash layout changes or stored settings will be silently misread.
+- Board: **ESP32S3 Dev Module** or "LilyGo T-Display-S3".
+- USB CDC On Boot: **Enabled** (sketch is built with `ARDUINO_USB_CDC_ON_BOOT=1`).
+- Flash size: 16MB; PSRAM: OPI PSRAM (T-Display-S3 N16R8).
+- All required libraries are vendored under `libraries/` (do **not** swap them for registry copies — see "Vendored library patches" below). Bundled libs include a customized `TFT_eSPI_DynamicSpeed`, `PU2CLR_SI4735` (locally patched), `Battery18650Stats`, `ESP32Time`, `GFX_Library_for_Arduino`, `Adafruit_BusIO`, `Adafruit_MPR121`.
+- EEPROM_SIZE is 2048; the sketch verifies `app_id = 47` at offset 0 before trusting persisted state — bump `app_id` whenever the on-flash layout changes or stored settings will be silently misread (see also the EEPROM-namespace caveat below).
 
 There are no automated tests; verification is manual on hardware.
+
+### PlatformIO
+
+`platformio.ini` defines two environments:
+
+- **`env:lilygo-t-display-s3`** — main firmware. `pio run -e lilygo-t-display-s3 -t upload`.
+- **`env:probe`** — builds `probe/probe.cpp` (a small standalone diagnostic — currently a TFT init + color cycle to confirm the parallel-8-bit ST7789 is wired per Setup206). `pio run -e probe -t upload`. Used to bisect hardware vs software issues on derivative boards.
+
+Notes that bit us when first wiring this up:
+
+- `[platformio] src_dir = .` keeps the sketch at repo root (matches upstream's layout). Per-env `build_src_filter` selects which files to build — globs like `+<*.ino>` work for the main env, but the probe env had to use `.cpp` (not `.ino`) because PlatformIO's `.ino → .cpp` conversion isn't filter-aware and would produce empty builds.
+- `lib_extra_dirs = libraries` makes vendored libs primary. The `TFT_eSPI_DynamicSpeed` folder declares itself as `name=TFT_eSPI` in `library.json`, so the sketch's `#include <TFT_eSPI.h>` resolves to it.
+- `board_build.arduino.memory_type = qio_opi` is required for OPI PSRAM on N16R8.
+- PlatformIO's bundled esptool.py needs `intelhex` in its venv (`<penv>/bin/python -m pip install intelhex`) on a fresh install; otherwise bootloader generation fails.
+- After `pio run -t upload`, the chip often does not auto-boot the flashed app via the RTS reset — ESP32-S3 native USB-CDC has no physical RTS line, esptool sends a software reset over USB but USB endpoint enumeration races against it. Manual RESET press is the workaround. This is generic to ESP32-S3 native-USB boards, not specific to HiWin.
+
+### Vendored library patches
+
+Two `Wire.begin()` calls in `libraries/PU2CLR_SI4735/src/SI4735.cpp` (in `getDeviceI2CAddress` and the long `setup` overload) are commented out. Upstream calls them with no arguments, which on PlatformIO + arduino-esp32 v2.0.17 + the `lilygo-t-display-s3` board variant routes I2C back to the variant's default SDA/SCL pins, clobbering the sketch's earlier `Wire.begin(ESP32_I2C_SDA=18, ESP32_I2C_SCL=17)`. The chip then fails to respond and `getDeviceI2CAddress` returns 0 → sketch hits its `Si4735 not detected` `while(1)` loop.
+
+If you ever upgrade or replace this library, **re-apply the patch** (search for `PATCHED OUT (Aiaid fork)` markers).
+
+### EEPROM / NVS namespace gotcha
+
+Arduino's `EEPROM` library on ESP32 stores its blob in NVS under namespace `"eeprom"`. Any prior firmware on the chip that used the same library (e.g. zooc's v3.4.0 on a HiWin board) leaves data there. After flashing this fork onto such a chip, `EEPROM.read(0)` may coincidentally equal `app_id` (47/0x2F is just an ASCII `/` byte, common in URL-storing firmware) and `readAllReceiverInformation()` triggers, loading garbage into `bandIdx`, `currentMode`, etc. — `band[bandIdx].bandName` then becomes a NULL pointer and `drawSprite()` crashes inside `TFT_eSPI::textWidth`.
+
+`setup()` therefore clamps these fields to safe defaults after the EEPROM-load branch:
+
+```c
+if (bandIdx < 0 || bandIdx > lastBand) bandIdx = 0;
+if (currentMode > LW) currentMode = FM;
+if (volume > 63) volume = DEFAULT_VOLUME;
+rx.setVolume(volume);   // re-apply, since rx.setup() set the chip to 30 internally
+```
+
+Bumping `app_id` is the cleanest reset across firmware migrations — the next boot will fail the sentinel check and start fresh.
+
+### Backlight ordering
+
+The original sequence sets `digitalWrite(PIN_LCD_BL, LOW)` early, then only turns on the backlight (via `ledcWrite`) at the very end of `setup()`. Any failure between (e.g. `getDeviceI2CAddress` returning 0 → `while(1)`) leaves the screen looking dead even though the on-screen `Si4735 not detected` red text was already rendered. This fork drives `PIN_LCD_BL` HIGH right after `pinMode` so all error states are visible.
 
 ### Hardware variants and rollback
 
@@ -78,4 +118,5 @@ The sketch is procedural Arduino — `setup()` initializes hardware, `loop()` is
 - Comments and UI strings are mostly Chinese; keep that consistent when adding user-facing text.
 - The sketch deliberately avoids `delay()` in `loop()` (only ~5 ms in a couple of places) — use `millis()` deltas like the existing `elapsedRSSI`, `elapsedCommand`, `lastRDSCheck`, `storeTime` pattern rather than blocking waits.
 - `itIsTimeToSave` + `STORE_TIME` (10 s) debounces EEPROM writes — set the flag from anywhere a setting changes and let the loop commit. Don't call `saveAllReceiverInformation()` synchronously from a UI handler.
-- `TFT_eSPI_DynamicSpeed` under `libraries/` is a fork — pin definitions and `User_Setup` are baked in. Don't replace it with upstream TFT_eSPI.
+- `TFT_eSPI_DynamicSpeed` under `libraries/` is a fork — pin definitions are taken from `User_Setups/Setup206_LilyGo_T_Display_S3.h` (parallel 8-bit ST7789, CS=6 DC=7 RST=5 WR=8 D0..D7=39,40,41,42,45,46,47,48). The bundled `User_Setup.h` at the library root has its pin defines commented out and is **not** the active config — `User_Setup_Select.h` enables Setup206 instead. Don't replace this lib with upstream TFT_eSPI.
+- `libraries/PU2CLR_SI4735/src/SI4735.cpp` is locally patched (see "Vendored library patches" above). Re-apply if upgrading.
