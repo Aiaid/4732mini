@@ -22,6 +22,34 @@ There is no Makefile, PlatformIO config, or CI. The sketch is meant to be opened
 
 There are no automated tests; verification is manual on hardware.
 
+### Hardware variants and rollback
+
+This Aiaid fork was opened against a **HiWin 4732 Pro** unit — a derivative of sunnygold's open-hardware 4732mini. That unit ships with a private zooc firmware **v3.4.0** that adds WiFi, internet-radio streaming (ESP32-audioI2S), and a web config / OTA panel — none of which are in this repo's source. Flashing this repo onto a HiWin board is a feature **downgrade**, not an upgrade. Always dump the factory image first.
+
+Dump the factory firmware before flashing anything custom:
+
+```bash
+# Find port (usually /dev/cu.usbmodem* on macOS, after BOOT+RESET into download mode)
+ls /dev/cu.usbmodem*
+
+# Full 16MB flash dump (takes ~3 min at 921600 baud)
+~/Library/Python/3.9/bin/esptool.py --chip esp32s3 \
+  --port /dev/cu.usbmodemNNNNNNN --baud 921600 \
+  read_flash 0 0x1000000 hiwin_4732_factory.bin
+```
+
+Roll back to the factory image after a failed experimental flash:
+
+```bash
+~/Library/Python/3.9/bin/esptool.py --chip esp32s3 \
+  --port /dev/cu.usbmodemNNNNNNN --baud 921600 \
+  write_flash 0 hiwin_4732_factory.bin
+```
+
+`*.bin` is gitignored. The dump contains NVS regions including WiFi credentials, so never commit or share it.
+
+Failure modes after flashing this fork's sketch on a 4732mini-derivative board are non-destructive and diagnose by symptom: black screen → `PIN_LCD_BL` (38) or `PIN_POWER_ON` (15) wrong; no audio → `AMP_EN` (10) / `AUDIO_MUTE` (3) / I2C (18/17) wrong; dead encoder → encoder pins (2/1/21) wrong. The board can always be re-entered into download mode (BOOT held + RESET tapped) and rolled back.
+
 ## Firmware architecture
 
 The sketch is procedural Arduino — `setup()` initializes hardware, `loop()` is a single dispatch loop. Understanding these cross-cutting structures matters more than reading top-to-bottom:
