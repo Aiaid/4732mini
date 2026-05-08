@@ -4,3 +4,7 @@
 # Firmware dumps and binaries
 *.bin
 factory*
+
+# PlatformIO
+.pio/
+.vscode/
