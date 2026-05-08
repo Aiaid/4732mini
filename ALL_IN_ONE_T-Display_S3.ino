@@ -63,7 +63,7 @@ double  CONV_FACTOR=1.71; //开机时加载用, 从flash中重新读取校准值
 
 #define MIN_ELAPSED_RSSI_TIME 20  //200
 #define ELAPSED_COMMAND 5000      // time to turn off the last command controlled by encoder. Time to goes back to the FVO control
-#define DEFAULT_VOLUME 35         // change it for your favorite sound volume
+#define DEFAULT_VOLUME 18         // change it for your favorite sound volume (SI4735 range: 0-63)
 #define RDS_CHECK_TIME 90
 
 #define FM 0
@@ -340,6 +340,9 @@ void setup() {
 
   pinMode(AMP_EN, OUTPUT);
 
+  // Force backlight on early so error messages on screen are visible
+  digitalWrite(PIN_LCD_BL, HIGH);
+
   rx.setI2CFastModeCustom(100000);
 
   int16_t si4735Addr = rx.getDeviceI2CAddress(RESET_PIN);  // Looks for the I2C bus address and set it.  Returns 0 if error
@@ -361,7 +364,7 @@ void setup() {
   delay(100);  //300
 
   EEPROM.begin(EEPROM_SIZE);
-  
+
   CONV_FACTOR =double( ( EEPROM.read(eeprom_address + 10) << 8 | EEPROM.read(eeprom_address + 11) ) / 1000.0  );    //读取系数高八位
 
   // Checking the EEPROM content
@@ -370,6 +373,18 @@ void setup() {
   } else
     rx.setVolume(volume);
 
+  // Defensive: validate fields loaded from EEPROM. The Arduino EEPROM library
+  // shares the "eeprom" NVS namespace with any prior firmware (e.g. zooc's
+  // v3.4.0 on a HiWin 4732 Pro), so EEPROM[0] can coincidentally equal app_id
+  // and we'd then read garbage. Clamp anything out-of-range back to a default.
+  if (bandIdx < 0 || bandIdx > lastBand) bandIdx = 0;
+  if (currentMode > LW) currentMode = FM;
+  if (volume > 63) volume = DEFAULT_VOLUME;
+
+  // Force the volume we want regardless of EEPROM path: rx.setup() inside
+  // PU2CLR sets it to 30 internally, and readAllReceiverInformation doesn't
+  // re-apply the value to the chip.
+  rx.setVolume(volume);
   useBand();
   showStatus();
   drawSprite();

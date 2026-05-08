@@ -230,7 +230,11 @@ int16_t SI4735::getDeviceI2CAddress(uint8_t resetPin)
 
     reset();
 
-    Wire.begin();
+    // Wire.begin();  // PATCHED OUT (Aiaid fork): reinitialising Wire here
+    // overrode the sketch's earlier Wire.begin(SDA, SCL) call with arduino-esp32
+    // board defaults, which on PlatformIO + lilygo-t-display-s3 are NOT
+    // 18/17, breaking I2C and causing the SI4732 to be mis-detected as missing.
+    // The caller is now expected to have initialised Wire with the correct pins.
     // check 0X11 I2C address
     Wire.beginTransmission(SI473X_ADDR_SEN_LOW);
     error = Wire.endTransmission();
@@ -578,7 +582,9 @@ void SI4735::setRefClockPrescaler(uint16_t prescale, uint8_t rclk_sel)
  */
 void SI4735::setup(uint8_t resetPin, uint8_t ctsIntEnable, uint8_t defaultFunction, uint8_t audioMode, uint8_t clockType, uint8_t gpo2Enable)
 {
-    Wire.begin();
+    // Wire.begin();  // PATCHED OUT (Aiaid fork): see getDeviceI2CAddress for
+    // rationale — reinitialising Wire here clobbers Wire.begin(SDA, SCL) that
+    // the sketch performs at the top of setup() with custom pins.
 
     this->resetPin = resetPin;
     this->ctsIntEnable = (ctsIntEnable != 0) ? 1 : 0; // Keeps old versions of the sketches running
